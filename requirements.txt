@@ -1,0 +1,6 @@
+streamlit
+browser-use
+playwright
+google-generativeai
+python-dotenv
+requests
