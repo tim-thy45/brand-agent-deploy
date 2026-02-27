@@ -2,22 +2,21 @@ import sys
 import asyncio
 import streamlit as st
 from agent import fetch_oem_pdf
+import requests
+from google.cloud import storage
+import base64
 
-# Windows compatibility (safe to keep)
-if sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+# Initialize session state so data persists across reruns
+if "pdf_data" not in st.session_state:
+    st.session_state.pdf_data = None
+if "pdf_filename" not in st.session_state:
+    st.session_state.pdf_filename = None
 
 st.title("OEM PDF Fetch Agent")
-
 brand = st.text_input("Brand Name")
 sku = st.text_input("Product SKU")
 
-
 def run_async_safely(coro):
-    """
-    Runs async function in a fresh event loop.
-    Safe for Streamlit + Cloud Run.
-    """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -25,24 +24,34 @@ def run_async_safely(coro):
     finally:
         loop.close()
 
-
 if st.button("Run Agent"):
     if brand and sku:
         with st.spinner("Running agent..."):
             try:
-                file_path = run_async_safely(fetch_oem_pdf(brand, sku))
+                blob_name = run_async_safely(fetch_oem_pdf(brand, sku))
 
-                st.success("PDF downloaded successfully!")
-
-                with open(file_path, "rb") as f:
-                    pdf_bytes = f.read()
-
-                st.download_button(
-                    label="Download PDF",
-                    data=pdf_bytes,
-                    file_name=file_path.split("/")[-1],
-                    mime="application/pdf"
-                )
+                client = storage.Client()
+                bucket = client.bucket("brand-agent-pdfs")
+                blob = bucket.blob(blob_name)
+                
+                # Fetch the bytes
+                pdf_bytes = blob.download_as_bytes()
+                st.session_state.pdf_data = pdf_bytes
+                
+                st.success(f"PDF retrieved!")
 
             except Exception as e:
-                st.error(str(e))
+                st.error(f"Error: {str(e)}")
+
+# DISPLAY THE PDF ON THE WEBSITE
+if st.session_state.pdf_data:
+    st.subheader("Preview Datasheet")
+    
+    # Encode bytes to base64 for embedding
+    base64_pdf = base64.b64encode(st.session_state.pdf_data).decode('utf-8')
+    
+    # Create an HTML iframe to display the PDF
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800" type="application/pdf"></iframe>'
+    
+    # Render the iframe
+    st.markdown(pdf_display, unsafe_allow_html=True)

@@ -4,3 +4,4 @@ playwright
 google-generativeai
 python-dotenv
 requests
+google-cloud-storage
