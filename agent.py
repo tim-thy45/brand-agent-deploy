@@ -60,14 +60,18 @@ def serp_discover_url(brand: str, sku: str):
 # 📥 Direct PDF Download
 # ------------------------------------------------------------
 async def download_direct_pdf(pdf_url: str):
-    r = requests.get(pdf_url, timeout=30)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    r = requests.get(pdf_url, headers=headers, timeout=60)
+    
+    # --- ADD THESE LOGS ---
+    print(f"DIAGNOSTIC: Status {r.status_code}")
+    print(f"DIAGNOSTIC: Type {r.headers.get('Content-Type')}")
+    print(f"DIAGNOSTIC: Real Size {len(r.content)} bytes")
+    # ----------------------
+
     if r.status_code == 200:
         pdf_bytes = r.content
-        # CHANGE: Rename variable to blob_name for clarity
-        blob_name = upload_to_gcs(pdf_bytes) 
-        return blob_name
-    else:
-        raise Exception(f"Failed to download PDF: {r.status_code}")
+        return upload_to_gcs(pdf_bytes)
 
 
 # ------------------------------------------------------------
